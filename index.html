@@ -265,7 +265,7 @@
     fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ option: key }),
+      body: JSON.stringify({ option: idx + 1 }),
       mode: 'no-cors'
     }).catch(() => {});
 
