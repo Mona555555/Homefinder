@@ -188,12 +188,16 @@
   function buildPopup(idx) {
     const p = places[idx];
     const current = votes[idx];
+    const locked = current !== null;
     const btns = OPTS.map(o =>
       `<button class="vbtn ${o.cls}${current === o.key ? ' selected' : ''}"
-        onclick="castVote(${idx},'${o.key}')">${o.key}</button>`
+        onclick="castVote(${idx},'${o.key}')"
+        ${locked ? 'disabled' : ''}
+        style="${locked && current !== o.key ? 'opacity:0.25;cursor:default;' : ''}"
+      >${o.key}</button>`
     ).join('');
-    const voted = current
-      ? `<div class="popup-voted">Szavazatod: <strong>${current}</strong></div>`
+    const voted = locked
+      ? `<div class="popup-voted">Szavazatod: <strong>${current}</strong> — végleges</div>`
       : `<div class="popup-voted">Kattints az egyik opcióra!</div>`;
     return `
       <div class="popup-title">${idx + 1}. ${p.name}</div>
@@ -242,6 +246,7 @@
 
   // ── Vote logic ─────────────────────────────────────────
   function castVote(idx, key) {
+    if (votes[idx] !== null) return;
     votes[idx] = key;
 
     // Refresh pin icon
@@ -265,7 +270,7 @@
     fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ option: idx + 1 }),
+      body: JSON.stringify({ button: idx + 1, choice: key }),
       mode: 'no-cors'
     }).catch(() => {});
 
