@@ -3,283 +3,235 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Budapest IX. kerület – Valószínű zóna</title>
+  <title>Irány haza!</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body { width: 100vw; height: 100vh; overflow: hidden; font-family: sans-serif; }
+    #map { width: 100%; height: 100%; }
 
-    header {
-      background: #1a1a2e;
-      color: #eee;
-      padding: 10px 16px;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    header strong { font-size: 16px; color: #fff; }
-
-    #map { flex: 1; min-height: 0; }
-
-    /* ── Popup vote buttons ── */
-    .popup-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
-    .popup-desc  { font-size: 12px; color: #555; margin-bottom: 10px; }
-    .popup-btns  { display: flex; gap: 6px; justify-content: center; }
-
-    .vbtn {
-      padding: 7px 14px;
-      border: 2px solid transparent;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: bold;
-      color: white;
-      cursor: pointer;
-      opacity: 0.6;
-      transition: opacity 0.15s, transform 0.1s, border-color 0.15s;
-    }
-    .vbtn:hover   { opacity: 0.85; transform: scale(1.05); }
-    .vbtn.selected { opacity: 1; border-color: #111; transform: scale(1.08); }
-    .vbtn.hideg   { background: #1d70b8; }
-    .vbtn.meleg   { background: #d62828; }
-    .vbtn.langyos { background: #e8749a; }
-
-    .popup-voted {
-      margin-top: 8px;
-      font-size: 11px;
-      color: #666;
-      text-align: center;
-      font-style: italic;
-    }
-
-    /* ── Info box ── */
-    .info-box {
-      background: #fffde7;
-      border: 2px solid #f9c400;
-      border-radius: 8px;
-      padding: 12px 14px;
-      max-width: 260px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-      font-size: 13px;
-      line-height: 1.6;
-      color: #333;
-    }
-
-    /* ── Legend ── */
-    .legend {
+    /* ── Dialog ── */
+    #dialog {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
       background: white;
-      padding: 8px 12px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      font-size: 12px;
-      line-height: 1.8;
+      border-radius: 18px;
+      padding: 20px 24px 16px;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.35);
+      z-index: 1000;
+      max-width: 420px;
+      width: 90vw;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
     }
-    .legend-dot {
-      display: inline-block;
-      width: 11px; height: 11px;
-      border-radius: 50%;
-      margin-right: 5px;
-      vertical-align: middle;
-      transition: background 0.35s;
+    #dialog.show {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(-50%) translateY(0);
     }
 
-    /* ── Completion overlay ── */
-    #completion {
+    .chat-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .chat-line.isti { flex-direction: row-reverse; }
+
+    .chat-avatar { font-size: 26px; flex-shrink: 0; line-height: 1; }
+
+    .chat-bubble {
+      padding: 9px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 280px;
+    }
+    .chat-line.bmw  .chat-bubble { background: #dbeafe; border-bottom-left-radius: 4px; }
+    .chat-line.isti .chat-bubble { background: #dcfce7; border-bottom-right-radius: 4px; }
+
+    .chat-name { font-size: 11px; font-weight: bold; color: #888; margin-bottom: 3px; }
+
+    #go-btn {
+      display: block;
+      margin: 4px auto 0;
+      padding: 10px 32px;
+      background: #1d70b8;
+      color: white;
+      border: none;
+      border-radius: 22px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #go-btn:hover { background: #145591; }
+
+    /* ── Welcome overlay ── */
+    #welcome {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 9999;
+      background: rgba(0,0,0,0.6);
+      z-index: 2000;
       align-items: center;
       justify-content: center;
-    }
-    #completion.show { display: flex; }
-    #completion-box {
-      background: transparent;
-      border-radius: 16px;
-      box-shadow: none;
-      padding: 0;
-      animation: pop 0.4s cubic-bezier(.17,.67,.38,1.3);
       cursor: pointer;
-      max-width: 90vw;
-      max-height: 90vh;
     }
-    @keyframes pop {
-      from { transform: scale(0.6); opacity: 0; }
-      to   { transform: scale(1);   opacity: 1; }
-    }
-    #completion-box h1 { display: none; }
-    #completion-box p  { display: none; }
-    #close-btn { display: none; }
-    #completion-box img {
+    #welcome.show { display: flex; }
+    #welcome img {
       max-width: 90vw;
       max-height: 90vh;
       border-radius: 16px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      display: block;
+      animation: pop 0.45s cubic-bezier(.17,.67,.38,1.3);
+    }
+    @keyframes pop {
+      from { transform: scale(0.55); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
     }
   </style>
 </head>
 <body>
 
-<header>
-  <strong>Budapest IX. kerület – Legvalószínűbb zóna</strong>
-  <span style="color:#aaa;">Belső-Ferencváros / Középső-Ferencváros déli része</span>
-</header>
-
 <div id="map"></div>
 
-<div id="completion">
-  <div id="completion-box" onclick="document.getElementById('completion').classList.remove('show')">
-    <img src="koszonet.png" alt="Köszönöm a kitöltést!" />
+<!-- Dialog -->
+<div id="dialog">
+  <div class="chat-line bmw">
+    <div class="chat-avatar">🚗</div>
+    <div>
+      <div class="chat-name">BMW</div>
+      <div class="chat-bubble">Szia Isti, hosszú volt a nap mi? Menjünk haza?</div>
+    </div>
   </div>
+  <div class="chat-line isti">
+    <div class="chat-avatar">🙋</div>
+    <div>
+      <div class="chat-name">Isti</div>
+      <div class="chat-bubble">Igen és még a megígért mazsolámat sem kaptam meg, irány haza!</div>
+    </div>
+  </div>
+  <button id="go-btn">Irány haza! 🚗</button>
+</div>
+
+<!-- Welcome overlay -->
+<div id="welcome" onclick="this.classList.remove('show')">
+  <img src="welcome.png" alt="Üdvözlünk otthon!" />
 </div>
 
 <script>
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzHMzruJ9NJIASBM3KXMkScsDjo7PgcySo7TtzaiUaW2gtfhSdTLG3epDk5vd79YLaz3g/exec';
+  const START = [47.5629, 19.0541];
+  const END   = [47.4739, 19.0722];
 
-  const places = [
-    { name: "Drégely utca", desc: "Vaskapu utca és Mester utca között.", coords: [47.4765, 19.0744], color: "#e63946" },
-    { name: "Vaskapu utca", desc: "Tóth Kálmán utca és Vágóhíd utca között.", coords: [47.4737, 19.0749], color: "#f4a261" },
-    { name: "Vágóhíd utca", desc: "Mester utca felőli sarok / City Home belső tömb.", coords: [47.4759, 19.0873], color: "#2a9d8f" },
-    { name: "Tóth Kálmán utca", desc: "Nádasdy utca és Vaskapu utca közötti szakasz.", coords: [47.4725, 19.0770], color: "#457b9d" },
-    { name: "Haller utca", desc: "Soroksári út és Vaskapu utca sarka.", coords: [47.4766, 19.0803], color: "#9b5de5" }
+  // Simplified route through Budapest (Óbuda → IX. kerület)
+  const ROUTE = [
+    [47.5629, 19.0541],
+    [47.5480, 19.0515],
+    [47.5300, 19.0540],
+    [47.5100, 19.0575],
+    [47.4960, 19.0620],
+    [47.4860, 19.0672],
+    [47.4739, 19.0722]
   ];
-
-  const OPTS = [
-    { key: 'Hideg',   cls: 'hideg',   bg: '#1d70b8' },
-    { key: 'Meleg',   cls: 'meleg',   bg: '#d62828' },
-    { key: 'Langyos', cls: 'langyos', bg: '#e8749a' }
-  ];
-
-  const votes   = new Array(places.length).fill(null);
-  const markers = [];
 
   // ── Map ────────────────────────────────────────────────
-  const map = L.map('map').setView([47.4755, 19.0756], 15);
+  const map = L.map('map', { zoomControl: false })
+    .setView(START, 16);
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
   }).addTo(map);
 
-  const zoneCoords = places.map(p => p.coords);
-  L.polyline([...zoneCoords, zoneCoords[0]], { color: '#e63946', weight: 2.5, opacity: 0.75, dashArray: '6,5' }).addTo(map);
-  L.polygon(zoneCoords, { color: '#e63946', fillColor: '#e63946', fillOpacity: 0.08, weight: 0 }).addTo(map);
+  // ── BMW marker ─────────────────────────────────────────
+  const bmwIcon = L.icon({
+    iconUrl: 'mosolybmw.png',
+    iconSize: [90, 68],
+    iconAnchor: [45, 34]
+  });
+  const bmwMarker = L.marker(START, { icon: bmwIcon, zIndexOffset: 1000 }).addTo(map);
 
-  // ── Icon builder ───────────────────────────────────────
-  function pinIcon(idx) {
-    const voteKey = votes[idx];
-    const bg = voteKey ? OPTS.find(o => o.key === voteKey).bg : places[idx].color;
-    return L.divIcon({
-      className: '',
-      html: `<div style="background:${bg};color:white;border-radius:50%;width:32px;height:32px;
-        display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;
-        border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);cursor:pointer;">${idx + 1}</div>`,
-      iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18]
-    });
-  }
-
-  // ── Popup content builder ──────────────────────────────
-  function buildPopup(idx) {
-    const p = places[idx];
-    const current = votes[idx];
-    const locked = current !== null;
-    const btns = OPTS.map(o =>
-      `<button class="vbtn ${o.cls}${current === o.key ? ' selected' : ''}"
-        onclick="castVote(${idx},'${o.key}')"
-        ${locked ? 'disabled' : ''}
-        style="${locked && current !== o.key ? 'opacity:0.25;cursor:default;' : ''}"
-      >${o.key}</button>`
-    ).join('');
-    const voted = locked
-      ? `<div class="popup-voted">Szavazatod: <strong>${current}</strong> — végleges</div>`
-      : `<div class="popup-voted">Kattints az egyik opcióra!</div>`;
-    return `
-      <div class="popup-title">${idx + 1}. ${p.name}</div>
-      <div class="popup-desc">${p.desc}</div>
-      <div class="popup-btns">${btns}</div>
-      ${voted}`;
-  }
-
-  // ── Markers ────────────────────────────────────────────
-  places.forEach((p, i) => {
-    const m = L.marker(p.coords, { icon: pinIcon(i) })
-      .addTo(map)
-      .bindPopup(() => {
-        const div = document.createElement('div');
-        div.innerHTML = buildPopup(i);
-        return div;
-      }, { maxWidth: 260, minWidth: 220 });
-    markers.push(m);
+  // ── Destination marker ─────────────────────────────────
+  const homeIcon = L.divIcon({
+    className: '',
+    html: `<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🏠</div>`,
+    iconSize: [32, 32], iconAnchor: [16, 32]
   });
 
-  // ── Info box (top-left) ────────────────────────────────
-  const infoBox = L.control({ position: 'topleft' });
-  infoBox.onAdd = function () {
-    const div = L.DomUtil.create('div', 'info-box');
-    div.innerHTML = `
-      <strong>Mennyire járok közel az alábbi pontokkal?</strong><br/>
-      Még jéghideg, már langyos vagy esetleg tűzforró????<br/><br/>
-      Kérlek szavazásoddal járulj hozzá, hogy ne maradjak a sötétben, jelenleg meg vagyok rekedve.<br/><br/>
-      <em>Egy szavazat egy mazsola, köszönöm a hozzájárulást!</em><br/><br/>
-      <strong>5 befutó helyszínem van jelenleg.</strong> Kérlek nyomj rá mind az 5 helyszínre és szavazz, hogy mennyire van közel a célhoz<br/>
-      (hideg – messze, meleg – naaaagyon közel, langyos – meh :D)
-    `;
-    return div;
-  };
-  infoBox.addTo(map);
+  // ── Step 1: show dialog after brief zoom-in pause ──────
+  setTimeout(() => {
+    document.getElementById('dialog').classList.add('show');
+  }, 1000);
 
-  // ── Legend (bottom-right) ──────────────────────────────
-  const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = function () {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = '<strong style="display:block;margin-bottom:4px;">Helyszínek</strong>' +
-      places.map((p, i) =>
-        `<div><span id="ldot-${i}" class="legend-dot" style="background:${p.color}"></span>${i + 1}. ${p.name}</div>`
-      ).join('');
-    return div;
-  };
-  legend.addTo(map);
+  // ── Step 2: "Irány haza!" clicked ─────────────────────
+  document.getElementById('go-btn').addEventListener('click', () => {
+    document.getElementById('dialog').classList.remove('show');
+    setTimeout(zoomOutAndDrive, 400);
+  });
 
-  // ── Vote logic ─────────────────────────────────────────
-  function castVote(idx, key) {
-    if (votes[idx] !== null) return;
-    votes[idx] = key;
+  function zoomOutAndDrive() {
+    const bounds = L.latLngBounds([START, END]).pad(0.12);
+    map.flyToBounds(bounds, { duration: 2.2, easeLinearity: 0.4 });
+    setTimeout(() => {
+      L.marker(END, { icon: homeIcon }).addTo(map);
+      drawLine();
+    }, 2600);
+  }
 
-    // Refresh pin icon
-    markers[idx].setIcon(pinIcon(idx));
+  // ── Animated line then car ─────────────────────────────
+  function drawLine() {
+    const pts = interpolate(ROUTE, 80);
+    const line = L.polyline([], {
+      color: '#1d70b8', weight: 4, opacity: 0.85,
+      dashArray: null
+    }).addTo(map);
 
-    // Refresh popup content while it's open
-    const popup = markers[idx].getPopup();
-    if (popup && popup.isOpen()) {
-      popup.setContent(() => {
-        const div = document.createElement('div');
-        div.innerHTML = buildPopup(idx);
-        return div;
-      });
+    let i = 0;
+    const timer = setInterval(() => {
+      line.addLatLng(pts[i]);
+      i++;
+      if (i >= pts.length) {
+        clearInterval(timer);
+        setTimeout(driveCar, 200);
+      }
+    }, 25);
+  }
+
+  function driveCar() {
+    const pts = interpolate(ROUTE, 300);
+    let i = 0;
+    const timer = setInterval(() => {
+      bmwMarker.setLatLng(pts[i]);
+      // Rotate icon direction (optional visual touch via CSS not easily done in Leaflet, skip)
+      i++;
+      if (i >= pts.length) {
+        clearInterval(timer);
+        setTimeout(() => document.getElementById('welcome').classList.add('show'), 700);
+      }
+    }, 35);
+  }
+
+  // ── Interpolation helper ───────────────────────────────
+  function interpolate(pts, steps) {
+    const segs = [];
+    let total = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const d = Math.hypot(pts[i][0] - pts[i+1][0], pts[i][1] - pts[i+1][1]);
+      segs.push(d); total += d;
     }
-
-    // Update legend dot
-    const ldot = document.getElementById(`ldot-${idx}`);
-    if (ldot) ldot.style.background = OPTS.find(o => o.key === key).bg;
-
-    // Send to Google Apps Script
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ button: idx + 1, choice: key }),
-      mode: 'no-cors'
-    }).catch(() => {});
-
-    // Check if all 5 voted
-    if (votes.every(v => v !== null)) {
-      setTimeout(() => {
-        markers[idx].closePopup();
-        document.getElementById('completion').classList.add('show');
-      }, 400);
+    const result = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const n = Math.max(2, Math.round((segs[i] / total) * steps));
+      for (let j = 0; j < n; j++) {
+        const t = j / n;
+        result.push([
+          pts[i][0] + t * (pts[i+1][0] - pts[i][0]),
+          pts[i][1] + t * (pts[i+1][1] - pts[i][1])
+        ]);
+      }
     }
+    result.push(pts[pts.length - 1]);
+    return result;
   }
 </script>
 </body>
